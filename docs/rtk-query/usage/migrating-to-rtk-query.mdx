@@ -22,7 +22,7 @@ The most common use case for side effects in Redux apps is fetching data. Redux 
 
 RTK Query is purpose-built to solve the use case of data fetching. While it can't replace all of the situations where you'd use thunks or other side effects approaches, **using RTK Query should eliminate the need for most of that hand-written side effects logic**.
 
-RTK Query is expected to cover a lot of overlapping behaviour that users may have previously used `createAsyncThunk` for, including caching purposes, and request lifecycle management (e.g. `isUninitialized`, `isLoading`, `isError` states).
+RTK Query is expected to cover a lot of overlapping behavior that users may have previously used `createAsyncThunk` for, including caching purposes, and request lifecycle management (e.g. `isUninitialized`, `isLoading`, `isError` states).
 
 In order to migrate data-fetching features from existing Redux tools to RTK Query, the appropriate endpoints should be added to an RTK Query API slice, and the previous feature code deleted. This generally will not include much common code kept between the two, as the tools work differently and one will replace the other.
 
@@ -72,7 +72,7 @@ export const fetchPokemonByName = createAsyncThunk<Pokemon, string>(
       return rejectWithValue(data)
     }
     return data
-  }
+  },
 )
 // highlight-end
 
@@ -169,7 +169,7 @@ export type RootState = ReturnType<typeof store.getState>
 
 In order to have the store accessible within our app, we will wrap our `App` component with a [`Provider`](https://react-redux.js.org/api/provider) component from `react-redux`.
 
-```tsx title="src/index.ts"
+```tsx no-transpile title="src/index.ts"
 import { render } from 'react-dom'
 // highlight-start
 import { Provider } from 'react-redux'
@@ -187,7 +187,7 @@ render(
     <App />
   </Provider>,
   // highlight-end
-  rootElement
+  rootElement,
 )
 ```
 
@@ -201,7 +201,7 @@ import { AsyncThunkAction } from '@reduxjs/toolkit'
 import { RootState } from '../store'
 interface Pokemon {}
 export declare const fetchPokemonByName: (
-  arg: string
+  arg: string,
 ) => AsyncThunkAction<Pokemon, string, {}>
 
 export const selectStatusByName = (state: RootState, name: string) =>
@@ -223,9 +223,9 @@ export type RootState = {
   pokemon: typeof initialPokemonSlice
 }
 
-export declare const store: EnhancedStore<RootState> 
+export declare const store: EnhancedStore<RootState>
 export type AppDispatch = typeof store.dispatch
-export declare const useAppDispatch: () => (...args: any[])=> any;
+export declare const useAppDispatch: () => (...args: any[]) => any
 
 // file: src/hooks.ts
 import { useEffect } from 'react'
@@ -243,7 +243,7 @@ export function useGetPokemonByNameQuery(name: string) {
   const dispatch = useAppDispatch()
   // select the current status from the store state for the provided name
   const status = useSelector((state: RootState) =>
-    selectStatusByName(state, name)
+    selectStatusByName(state, name),
   )
   // select the current data from the store state for the provided name
   const data = useSelector((state: RootState) => selectDataByName(state, name))
@@ -271,12 +271,12 @@ export function useGetPokemonByNameQuery(name: string) {
 
 Our code above meets all of the design specifications, so let's use it! Below we can see how the hook can be called in a component, and return the relevant data & status booleans.
 
-Our implementation below provides the following behaviour in the component:
+Our implementation below provides the following behavior in the component:
 
 - When our component is mounted, if a request for the provided pokemon name has not already been sent for the session, send the request off
 - The hook always provides the latest received `data` when available, as well as the request status booleans `isUninitialized`, `isPending`, `isFulfilled` & `isRejected` in order to determine the current UI at any given moment as a function of our state.
 
-```tsx title="src/App.tsx"
+```tsx no-transpile title="src/App.tsx"
 import * as React from 'react'
 // highlight-start
 import { useGetPokemonByNameQuery } from './hooks'

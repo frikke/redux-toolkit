@@ -9,6 +9,7 @@ es
 
 .yalc
 yalc.lock
+yalc.sig
 
 .idea/
 .vscode/
@@ -30,6 +31,4 @@ typesversions
 .pnp.*
 *.tgz
 
-.yalc
-yalc.lock
-yalc.sig
+tsconfig.vitest-temp.json

@@ -27,7 +27,7 @@ hide_title: true
 
 Welcome to the Redux Toolkit TypeScript Quick Start tutorial! **This tutorial will briefly show how to use TypeScript with Redux Toolkit**.
 
-This page focuses on just how to set up the TypeScript aspects . For explanations of what Redux is, how it works, and full examples of how to use Redux Toolkit, [see the tutorials linked in the "Tutorials Overview" page](./overview.md).
+This page focuses on just how to set up the TypeScript aspects. For explanations of what Redux is, how it works, and full examples of how to use Redux Toolkit, [see the tutorials linked in the "Tutorials Overview" page](./overview.md).
 
 Redux Toolkit is already written in TypeScript, so its TS type definitions are built in.
 
@@ -76,13 +76,12 @@ Since these are actual variables, not types, it's important to define them in a 
 
 ```ts title="app/hooks.ts"
 import { useDispatch, useSelector } from 'react-redux'
-import type { TypedUseSelectorHook } from 'react-redux'
 import type { RootState, AppDispatch } from './store'
 
 // highlight-start
 // Use throughout your app instead of plain `useDispatch` and `useSelector`
-export const useAppDispatch: () => AppDispatch = useDispatch
-export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+export const useAppDispatch = useDispatch.withTypes<AppDispatch>()
+export const useAppSelector = useSelector.withTypes<RootState>()
 // highlight-end
 ```
 
@@ -149,14 +148,14 @@ In some cases, [TypeScript may unnecessarily tighten the type of the initial sta
 // Workaround: cast state instead of declaring variable type
 const initialState = {
   value: 0,
-} as CounterState
+} satisfies CounterState as CounterState
 ```
 
 ### Use Typed Hooks in Components
 
 In component files, import the pre-typed hooks instead of the standard hooks from React-Redux.
 
-```tsx title="features/counter/Counter.tsx"
+```tsx no-transpile title="features/counter/Counter.tsx"
 import React, { useState } from 'react'
 
 // highlight-next-line

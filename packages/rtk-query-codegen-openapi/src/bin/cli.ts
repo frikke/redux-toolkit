@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 
+import { generateEndpoints, parseConfig } from '@rtk-query/codegen-openapi';
 import program from 'commander';
-import { dirname, resolve } from 'path';
-import { generateEndpoints, parseConfig } from '../';
-import semver from 'semver';
-import { version as tsVersion } from 'typescript';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
-if (!semver.satisfies(tsVersion, '>=4.1 <=4.5')) {
-  console.warn(
-    'Please note that `@rtk-query/codegen-openapi` only has been tested with TS versions 4.1 to 4.5 - other versions might cause problems.'
-  );
-}
+const require = createRequire(__filename);
 
 let ts = false;
 try {
@@ -43,10 +38,10 @@ program.version(meta.version).usage('</path/to/config.js>').parse(process.argv);
 
 const configFile = program.args[0];
 
-if (program.args.length === 0 || !/\.(c?(jsx?|tsx?)|jsonc?)?$/.test(configFile)) {
+if (program.args.length === 0 || !/\.([mc]?(jsx?|tsx?)|jsonc?)?$/.test(configFile)) {
   program.help();
 } else {
-  if (/\.tsx?$/.test(configFile) && !ts) {
+  if (/\.[mc]?tsx?$/.test(configFile) && !ts) {
     console.error('Encountered a TypeScript configfile, but neither esbuild-runner nor ts-node are installed.');
     process.exit(1);
   }
