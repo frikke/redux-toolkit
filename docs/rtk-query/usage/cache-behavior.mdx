@@ -12,7 +12,7 @@ description: 'RTK Query > Usage > Cache Behavior: defaults, cache lifetimes, and
 
 A key feature of RTK Query is its management of cached data. When data is fetched from the server, RTK Query will store the data in the Redux store as a 'cache'. When an additional request is performed for the same data, RTK Query will provide the existing cached data rather than sending an additional request to the server.
 
-RTK Query provides a number of concepts and tools to manipulate the cache behaviour and adjust it to your needs.
+RTK Query provides a number of concepts and tools to manipulate the cache behavior and adjust it to your needs.
 
 ## Default Cache Behavior
 
@@ -73,7 +73,7 @@ If 'ComponentThree' is unmounted in the example above, regardless of how much ti
 
 ## Manipulating Cache Behavior
 
-On top of the default behaviour, RTK Query provides a number of methods to re-fetch data earlier in scenarios where it should be considered invalid, or is otherwise deemed suitable to be 'refreshed'.
+On top of the default behavior, RTK Query provides a number of methods to re-fetch data earlier in scenarios where it should be considered invalid, or is otherwise deemed suitable to be 'refreshed'.
 
 ### Reducing subscription time with `keepUnusedDataFor`
 
@@ -120,7 +120,7 @@ Calling the `refetch` function will force refetch the associated query.
 
 Alternatively, you can dispatch the `initiate` thunk action for an endpoint, passing the option `forceRefetch: true` to the thunk action creator for the same effect.
 
-```tsx title="Force refetch example"
+```tsx no-transpile title="Force refetch example"
 import { useDispatch } from 'react-redux'
 import { useGetPostsQuery } from './api'
 
@@ -138,8 +138,8 @@ const Component = () => {
     dispatch(
       api.endpoints.getPosts.initiate(
         { count: 5 },
-        { subscribe: false, forceRefetch: true }
-      )
+        { subscribe: false, forceRefetch: true },
+      ),
     )
   }
 
@@ -197,7 +197,7 @@ export const api = createApi({
 })
 ```
 
-```tsx title="Forcing refetch on component mount"
+```tsx no-transpile title="Forcing refetch on component mount"
 import { useGetPostsQuery } from './api'
 
 const Component = () => {
@@ -206,7 +206,7 @@ const Component = () => {
     // highlight-start
     // this overrules the api definition setting,
     // forcing the query to always fetch when this component is mounted
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: true },
     // highlight-end
   )
 
@@ -403,7 +403,7 @@ The Redux docs have always recommended [keeping data in a normalized lookup tabl
 
 There are a couple additional points that can help here:
 
-- The generated query hooks have [a `selectFromResult` option](../api/created-api/hooks.mdx#selectfromresult) that allow components to read individual pieces of data from a query result. As an example, a `<TodoList>` component might call `useTodosQuery()`, and each individual `<TodoListItem>` could use the same query hook but select from the result to get the right todo object.
+- The generated query hooks have [a `selectFromResult` option](../api/created-api/hooks.mdx#usequery) that allow components to read individual pieces of data from a query result. As an example, a `<TodoList>` component might call `useTodosQuery()`, and each individual `<TodoListItem>` could use the same query hook but select from the result to get the right todo object.
 - You can use the [`transformResponse` endpoint option](../api/createApi.mdx#transformresponse) to modify the fetched data so that it's [stored in a different shape](./customizing-queries.mdx#customizing-query-responses-with-transformresponse), such as using `createEntityAdapter` to normalize the data _for this one response_ before it's inserted into the cache.
 
 ### Further information

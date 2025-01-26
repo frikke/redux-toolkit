@@ -16,6 +16,11 @@ description: 'RTK Query > API: createApi reference'
 
 Typically, you should only have one API slice per base URL that your application needs to communicate with. For example, if your site fetches data from both `/api/posts` and `/api/users`, you would have a single API slice with `/api/` as the base URL, and separate endpoint definitions for `posts` and `users`. This allows you to effectively take advantage of [automated re-fetching](../usage/automated-refetching.mdx) by defining [tag](../usage/automated-refetching.mdx#tags) relationships across endpoints.
 
+This is because:
+
+- Automatic tag invalidation only works within a single API slice. If you have multiple API slices, the automatic invalidation won't work across them.
+- Every `createApi` call generates its own middleware, and each middleware added to the store will run checks against every dispatched action. That has a perf cost that adds up. So, if you called `createApi` 10 times and added 10 separate API middleware to the store, that will be noticeably slower perf-wise.
+
 For maintainability purposes, you may wish to split up endpoint definitions across multiple files, while still maintaining a single API slice which includes all of these endpoints. See [code splitting](../usage/code-splitting.mdx) for how you can use the `injectEndpoints` property to inject API endpoints from other files into a single API slice definition.
 
 :::
@@ -49,7 +54,7 @@ export const { useGetPokemonByNameQuery } = pokemonApi
 // highlight-end
 ```
 
-## Parameters
+## `createApi` Parameters
 
 `createApi` accepts a single configuration object parameter with the following options:
 
@@ -57,7 +62,7 @@ export const { useGetPokemonByNameQuery } = pokemonApi
   baseQuery(args: InternalQueryArgs, api: BaseQueryApi, extraOptions?: DefinitionExtraOptions): any;
   endpoints(build: EndpointBuilder<InternalQueryArgs, TagTypes>): Definitions;
   extractRehydrationInfo?: (
-    action: AnyAction,
+    action: UnknownAction,
     {
       reducerPath,
     }: {
@@ -82,11 +87,16 @@ export const { useGetPokemonByNameQuery } = pokemonApi
 #### baseQuery function arguments
 
 - `args` - The return value of the `query` function for a given endpoint
-- `api` - The `BaseQueryApi` object, containing `signal`, `dispatch`, `getState` and `extra` properties
+- `api` - The `BaseQueryApi` object contains:
   - `signal` - An [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal) object that may be used to abort DOM requests and/or read whether the request is aborted.
+  - `abort` - The [`abort()`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController/abort) method of the AbortController attached to `signal`.
   - `dispatch` - The `store.dispatch` method for the corresponding Redux store
   - `getState` - A function that may be called to access the current store state
   - `extra` - Provided as thunk.extraArgument to the configureStore getDefaultMiddleware option.
+  - `endpoint` - The name of the endpoint.
+  - `type` - Type of request (`query` or `mutation`).
+  - `forced` - Indicates if a query has been forced.
+  - `queryCacheKey`- The computed query cache key.
 - `extraOptions` - The value of the optional `extraOptions` property provided for a given endpoint
 
 #### baseQuery function signature
@@ -97,17 +107,22 @@ export type BaseQueryFn<
   Result = unknown,
   Error = unknown,
   DefinitionExtraOptions = {},
-  Meta = {}
+  Meta = {},
 > = (
   args: Args,
   api: BaseQueryApi,
-  extraOptions: DefinitionExtraOptions
+  extraOptions: DefinitionExtraOptions,
 ) => MaybePromise<QueryReturnValue<Result, Error, Meta>>
 
 export interface BaseQueryApi {
   signal: AbortSignal
+  abort: (reason?: string) => void
   dispatch: ThunkDispatch<any, any, any>
   getState: () => unknown
+  extra: unknown
+  endpoint: string
+  type: 'query' | 'mutation'
+  forced?: boolean
 }
 
 export type QueryReturnValue<T = unknown, E = unknown, M = unknown> =
@@ -129,7 +144,7 @@ export type QueryReturnValue<T = unknown, E = unknown, M = unknown> =
 
 [summary](docblock://query/createApi.ts?token=CreateApiOptions.endpoints)
 
-See [Anatomy of an endpoint](#anatomy-of-an-endpoint) for details on individual properties.
+See [Endpoint Definition Parameters](#endpoint-definition-parameters) for details on individual properties.
 
 #### Query endpoint definition
 
@@ -139,7 +154,7 @@ export type QueryDefinition<
   BaseQuery extends BaseQueryFn,
   TagTypes extends string,
   ResultType,
-  ReducerPath extends string = string
+  ReducerPath extends string = string,
 > = {
   query(arg: QueryArg): BaseQueryArg<BaseQuery>
 
@@ -148,21 +163,21 @@ export type QueryDefinition<
     arg: QueryArg,
     api: BaseQueryApi,
     extraOptions: BaseQueryExtraOptions<BaseQuery>,
-    baseQuery: (arg: Parameters<BaseQuery>[0]) => ReturnType<BaseQuery>
+    baseQuery: (arg: Parameters<BaseQuery>[0]) => ReturnType<BaseQuery>,
   ): MaybePromise<QueryReturnValue<ResultType, BaseQueryError<BaseQuery>>>
 
   /* transformResponse only available with `query`, not `queryFn` */
   transformResponse?(
     baseQueryReturnValue: BaseQueryResult<BaseQuery>,
     meta: BaseQueryMeta<BaseQuery>,
-    arg: QueryArg
+    arg: QueryArg,
   ): ResultType | Promise<ResultType>
 
   /* transformErrorResponse only available with `query`, not `queryFn` */
   transformErrorResponse?(
     baseQueryReturnValue: BaseQueryError<BaseQuery>,
     meta: BaseQueryMeta<BaseQuery>,
-    arg: QueryArg
+    arg: QueryArg,
   ): unknown
 
   extraOptions?: BaseQueryExtraOptions<BaseQuery>
@@ -186,7 +201,7 @@ export type QueryDefinition<
       queryFulfilled,
       getCacheEntry,
       updateCachedData, // available for query endpoints only
-    }: QueryLifecycleApi
+    }: QueryLifecycleApi,
   ): Promise<void>
 
   onCacheEntryAdded?(
@@ -200,7 +215,7 @@ export type QueryDefinition<
       cacheDataLoaded,
       getCacheEntry,
       updateCachedData, // available for query endpoints only
-    }: QueryCacheLifecycleApi
+    }: QueryCacheLifecycleApi,
   ): Promise<void>
 }
 ```
@@ -214,7 +229,7 @@ export type MutationDefinition<
   TagTypes extends string,
   ResultType,
   ReducerPath extends string = string,
-  Context = Record<string, any>
+  Context = Record<string, any>,
 > = {
   query(arg: QueryArg): BaseQueryArg<BaseQuery>
 
@@ -223,21 +238,21 @@ export type MutationDefinition<
     arg: QueryArg,
     api: BaseQueryApi,
     extraOptions: BaseQueryExtraOptions<BaseQuery>,
-    baseQuery: (arg: Parameters<BaseQuery>[0]) => ReturnType<BaseQuery>
+    baseQuery: (arg: Parameters<BaseQuery>[0]) => ReturnType<BaseQuery>,
   ): MaybePromise<QueryReturnValue<ResultType, BaseQueryError<BaseQuery>>>
 
   /* transformResponse only available with `query`, not `queryFn` */
   transformResponse?(
     baseQueryReturnValue: BaseQueryResult<BaseQuery>,
     meta: BaseQueryMeta<BaseQuery>,
-    arg: QueryArg
+    arg: QueryArg,
   ): ResultType | Promise<ResultType>
 
   /* transformErrorResponse only available with `query`, not `queryFn` */
   transformErrorResponse?(
     baseQueryReturnValue: BaseQueryError<BaseQuery>,
     meta: BaseQueryMeta<BaseQuery>,
-    arg: QueryArg
+    arg: QueryArg,
   ): unknown
 
   extraOptions?: BaseQueryExtraOptions<BaseQuery>
@@ -253,7 +268,7 @@ export type MutationDefinition<
       requestId,
       queryFulfilled,
       getCacheEntry,
-    }: MutationLifecycleApi
+    }: MutationLifecycleApi,
   ): Promise<void>
 
   onCacheEntryAdded?(
@@ -266,7 +281,7 @@ export type MutationDefinition<
       cacheEntryRemoved,
       cacheDataLoaded,
       getCacheEntry,
-    }: MutationCacheLifecycleApi
+    }: MutationCacheLifecycleApi,
   ): Promise<void>
 }
 ```
@@ -342,6 +357,10 @@ See also [Server Side Rendering](../usage/server-side-rendering.mdx) and
 
 By default, this function will take the query arguments, sort object keys where applicable, stringify the result, and concatenate it with the endpoint name. This creates a cache key based on the combination of arguments + endpoint name (ignoring object key order), such that calling any given endpoint with the same arguments will result in the same cache key.
 
+### `invalidationBehavior`
+
+[summary](docblock://query/createApi.ts?token=CreateApiOptions.invalidationBehavior)
+
 ### `keepUnusedDataFor`
 
 [summary](docblock://query/createApi.ts?token=CreateApiOptions.keepUnusedDataFor)
@@ -374,7 +393,7 @@ You can set this globally in `createApi`, but you can also override the default 
 If you specify `track: false` when manually dispatching queries, RTK Query will not be able to automatically refetch for you.
 :::
 
-## Anatomy of an endpoint
+## Endpoint Definition Parameters
 
 ### `query`
 
@@ -382,7 +401,7 @@ _(required if no `queryFn` provided)_
 
 ```ts title="query signature" no-transpile
 export type query = <QueryArg>(
-  arg: QueryArg
+  arg: QueryArg,
 ) => string | Record<string, unknown>
 
 // with `fetchBaseQuery`
@@ -499,7 +518,7 @@ See also [Invalidating cache data](../usage/automated-refetching.mdx#invalidatin
 
 _(optional, only for query endpoints)_
 
-Overrides the api-wide definition of `keepUnusedDataFor` for this endpoint only.a
+Overrides the api-wide definition of `keepUnusedDataFor` for this endpoint only.
 
 [summary](docblock://query/createApi.ts?token=CreateApiOptions.keepUnusedDataFor)
 
@@ -570,7 +589,7 @@ async function onQueryStarted(
     requestId,
     queryFulfilled,
     getCacheEntry,
-  }: MutationLifecycleApi
+  }: MutationLifecycleApi,
 ): Promise<void>
 ```
 
@@ -585,7 +604,7 @@ async function onQueryStarted(
     queryFulfilled,
     getCacheEntry,
     updateCachedData, // available for query endpoints only
-  }: QueryLifecycleApi
+  }: QueryLifecycleApi,
 ): Promise<void>
 ```
 
@@ -662,7 +681,7 @@ async function onCacheEntryAdded(
     cacheEntryRemoved,
     cacheDataLoaded,
     getCacheEntry,
-  }: MutationCacheLifecycleApi
+  }: MutationCacheLifecycleApi,
 ): Promise<void>
 ```
 
@@ -678,7 +697,7 @@ async function onCacheEntryAdded(
     cacheDataLoaded,
     getCacheEntry,
     updateCachedData, // available for query endpoints only
-  }: QueryCacheLifecycleApi
+  }: QueryCacheLifecycleApi,
 ): Promise<void>
 ```
 

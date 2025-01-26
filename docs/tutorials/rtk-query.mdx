@@ -23,7 +23,7 @@ hide_title: true
 
 ## Introduction
 
-Welcome to the Redux Toolkit Query tutorial! **This tutorial will briefly introduce you to Redux Toolkit's "RTK Query" data fetching capability and teach you how to start using it correctly**. 
+Welcome to the Redux Toolkit Query tutorial! **This tutorial will briefly introduce you to Redux Toolkit's "RTK Query" data fetching capability and teach you how to start using it correctly**.
 
 :::info
 
@@ -141,7 +141,7 @@ export default function App() {
   return <div>...</div>
 }
 
-// file: app/store.ts noEmit
+// file: store.ts noEmit
 import { configureStore } from '@reduxjs/toolkit'
 
 export const store = configureStore({
@@ -150,19 +150,27 @@ export const store = configureStore({
 
 // file: index.tsx
 import * as React from 'react'
-import { render } from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 
 import App from './App'
-import { store } from './app/store'
+import { store } from './store'
 
-const rootElement = document.getElementById('root')
-render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  rootElement
-)
+const container = document.getElementById('root')
+
+if (container) {
+  const root = createRoot(container)
+
+  root.render(
+    <Provider store={store}>
+      <App />
+    </Provider>,
+  )
+} else {
+  throw new Error(
+    "Root element with ID 'root' was not found in the document. Ensure there is a corresponding HTML element with the ID 'root' in your HTML file.",
+  )
+}
 ```
 
 ## Use the query in a component

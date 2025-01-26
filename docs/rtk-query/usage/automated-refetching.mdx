@@ -108,7 +108,7 @@ By declaring these tags as what can possibly be provided to the cache, it enable
 
 ### Providing cache data
 
-Each individual `query` endpoint can have its cached data _provide_ particular tags. Doing so enables a relationship between cached data from one or more query endpoints and the behaviour of one or more mutation endpoints.
+Each individual `query` endpoint can have its cached data _provide_ particular tags. Doing so enables a relationship between cached data from one or more query endpoints and the behavior of one or more mutation endpoints.
 
 The `providesTags` property on a `query` endpoint is used for this purpose.
 
@@ -232,12 +232,12 @@ const api = createApi({
 Note that for the example above, the `id` is used where possible on a successful result. In the case of an error, no result is supplied, and we still consider that it has provided the general `'Post'` tag type rather than any specific instance of that tag.
 
 :::tip Advanced List Invalidation
-In order to provide stronger control over invalidating the appropriate data, you can use an arbitrary ID such a `'LIST'` for a given tag. See [Advanced Invalidation with abstract tag IDs](#advanced-invalidation-with-abstract-tag-ids) for additional details.
+In order to provide stronger control over invalidating the appropriate data, you can use an arbitrary ID such as `'LIST'` for a given tag. See [Advanced Invalidation with abstract tag IDs](#advanced-invalidation-with-abstract-tag-ids) for additional details.
 :::
 
 ### Invalidating cache data
 
-Each individual mutation endpoint can `invalidate` particular tags for existing cached data. Doing so enables a relationship between cached data from one or more query endpoints and the behaviour of one or more mutation endpoints.
+Each individual mutation endpoint can `invalidate` particular tags for existing cached data. Doing so enables a relationship between cached data from one or more query endpoints and the behavior of one or more mutation endpoints.
 
 The `invalidatesTags` property on a mutation endpoint is used for this purpose.
 
@@ -381,7 +381,7 @@ const api = createApi({
 For the example above, rather than invalidating any tag with the type `'Post'`, calling the `editPost` mutation function will now only invalidate a tag for the provided `id`. I.e. if cached data from an endpoint does not provide a `'Post'` for that same `id`, it will remain considered as 'valid', and will not be triggered to automatically re-fetch.
 
 :::tip Using abstract tag IDs
-In order to provide stronger control over invalidating the appropriate data, you can use an arbitrary ID such a `'LIST'` for a given tag. See [Advanced Invalidation with abstract tag IDs](#advanced-invalidation-with-abstract-tag-ids) for additional details.
+In order to provide stronger control over invalidating the appropriate data, you can use an arbitrary ID such as `'LIST'` for a given tag. See [Advanced Invalidation with abstract tag IDs](#advanced-invalidation-with-abstract-tag-ids) for additional details.
 :::
 
 ## Tag Invalidation Behavior
@@ -621,7 +621,7 @@ A powerful use-case is to use an ID like `'LIST'` as a label for data provided b
 
 :::
 
-We can compare the scenarios below to see how using a `'LIST'` id can be leveraged to optimize behaviour.
+We can compare the scenarios below to see how using a `'LIST'` id can be leveraged to optimize behavior.
 
 #### Invalidating everything of a type
 
@@ -668,7 +668,7 @@ export const api = createApi({
 export const { useGetPostsQuery, useGetPostQuery, useAddPostMutation } = api
 ```
 
-```tsx title="App.tsx"
+```tsx no-transpile title="App.tsx"
 function App() {
   const { data: posts } = useGetPostsQuery()
   const [addPost] = useAddPostMutation()
@@ -742,7 +742,7 @@ export const api = createApi({
 export const { useGetPostsQuery, useAddPostMutation, useGetPostQuery } = api
 ```
 
-```tsx title="App.tsx"
+```tsx no-transpile title="App.tsx"
 function App() {
   const { data: posts } = useGetPostsQuery()
   const [addPost] = useAddPostMutation()
@@ -774,7 +774,7 @@ If you intend for the `addPost` mutation to refresh all posts including individu
 
 The information provided to the cache is not limited to successful data fetches. The concept can be used to inform RTK Query that when a particular failure has been encountered, to `provide` a specific `tag` for that failed cache data. A separate endpoint can then `invalidate` the data for that `tag`, telling RTK Query to re-attempt the previously failed endpoints if a component is still subscribed to the failed data.
 
-The example below demonstrates an example with the following behaviour:
+The example below demonstrates an example with the following behavior:
 
 - Provides an `UNAUTHORIZED` cache tag if a query fails with an error code of `401 UNAUTHORIZED`
 - Provides an `UNKNOWN_ERROR` cache tag if a query fails with a different error
@@ -809,8 +809,8 @@ const api = createApi({
         result
           ? [{ type: 'Post', id }]
           : error?.status === 401
-          ? ['UNAUTHORIZED']
-          : ['UNKNOWN_ERROR'],
+            ? ['UNAUTHORIZED']
+            : ['UNKNOWN_ERROR'],
     }),
     login: build.mutation<LoginResponse, void>({
       query: () => '/login',
@@ -908,7 +908,7 @@ import type { Post, User } from './types'
 // highlight-start
 function providesList<R extends { id: string | number }[], T extends string>(
   resultsWithIds: R | undefined,
-  tagType: T
+  tagType: T,
 ) {
   return resultsWithIds
     ? [

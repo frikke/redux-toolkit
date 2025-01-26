@@ -26,7 +26,7 @@ export const handlers = [
       return res(
         ctx.json({ error: 'Oh no, there was an error, try again.' }),
         ctx.status(500),
-        ctx.delay(300)
+        ctx.delay(300),
       )
     }
 
@@ -44,14 +44,18 @@ export const handlers = [
       return res(
         ctx.json({ error: 'Oh no, there was an error, try again.' }),
         ctx.status(500),
-        ctx.delay(300)
+        ctx.delay(300),
       )
     }
 
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
 
     const post = db.post.update({
-      where: { id },
+      where: {
+        id: {
+          equals: id,
+        },
+      },
       data: { name },
     })
 

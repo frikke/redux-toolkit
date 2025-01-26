@@ -18,13 +18,37 @@ The default method to handle queries is via the [`baseQuery`](../api/createApi#b
 
 To process queries, endpoints are defined with a [`query`](../api/createApi.mdx#query) option, which passes its return value to a common [`baseQuery`](../api/createApi#basequery) function used for the API.
 
-By default, RTK Query ships with [`fetchBaseQuery`](../api/fetchBaseQuery), which is a lightweight [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) wrapper that automatically handles request headers and response parsing in a manner similar to common libraries like `axios`. If `fetchBaseQuery` alone does not meet your needs, you can customize its behaviour with a wrapper function, or create your own [`baseQuery`](../api/createApi.mdx#basequery) function from scratch for [`createApi`](../api/createApi) to use.
+By default, RTK Query ships with [`fetchBaseQuery`](../api/fetchBaseQuery), which is a lightweight [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) wrapper that automatically handles request headers and response parsing in a manner similar to common libraries like `axios`. If `fetchBaseQuery` alone does not meet your needs, you can customize its behavior with a wrapper function, or create your own [`baseQuery`](../api/createApi.mdx#basequery) function from scratch for [`createApi`](../api/createApi) to use.
 
 See also [`baseQuery API Reference`](../api/createApi.mdx#basequery).
 
 ### Implementing a custom `baseQuery`
 
 RTK Query expects a `baseQuery` function to be called with three arguments: `args`, `api`, and `extraOptions`. It is expected to return an object with either a `data` or `error` property, or a promise that resolves to return such an object.
+
+:::tip
+
+Base query and query functions must _always_ catch errors themselves, and return it in an object!
+
+```ts no-transpile
+function brokenCustomBaseQuery() {
+  // ❌ Don't let this throw by itself
+  const data = await fetchSomeData()
+  return { data }
+}
+
+function correctCustomBaseQuery() {
+  // ✅ Catch errors and _return_ them so the RTKQ logic can track it
+  try {
+    const data = await fetchSomeData()
+    return { data }
+  } catch (error) {
+    return { error }
+  }
+}
+```
+
+:::
 
 #### baseQuery function arguments
 
@@ -33,7 +57,7 @@ const customBaseQuery = (
   // highlight-start
   args,
   { signal, dispatch, getState },
-  extraOptions
+  extraOptions,
   // highlight-end
 ) => {
   // omitted
@@ -53,7 +77,7 @@ const customBaseQuery = (
 const customBaseQuery = (
   args,
   { signal, dispatch, getState },
-  extraOptions
+  extraOptions,
 ) => {
   // highlight-start
   if (Math.random() > 0.5) return { error: 'Too high!' }
@@ -73,18 +97,21 @@ At its core, a `baseQuery` function only needs to have the minimum return value 
 For [`fetchBaseQuery`](../api/fetchBaseQuery) specifically, the return type is as follows:
 
 ```ts title="Return types of fetchBaseQuery" no-transpile
-Promise<{
-    data: any;
-    error?: undefined;
-    meta?: { request: Request; response: Response };
-} | {
-    error: {
-        status: number;
-        data: any;
-    };
-    data?: undefined;
-    meta?: { request: Request; response: Response };
-}>
+Promise<
+  | {
+      data: any
+      error?: undefined
+      meta?: { request: Request; response: Response }
+    }
+  | {
+      error: {
+        status: number
+        data: any
+      }
+      data?: undefined
+      meta?: { request: Request; response: Response }
+    }
+>
 ```
 
 1.  ```ts title="Expected success result format with fetchBaseQuery" no-transpile
@@ -106,7 +133,7 @@ By default, the payload from the server is returned directly.
 function defaultTransformResponse(
   baseQueryReturnValue: unknown,
   meta: unknown,
-  arg: unknown
+  arg: unknown,
 ) {
   return baseQueryReturnValue
 }
@@ -187,7 +214,7 @@ By default, the payload from the server is returned directly.
 function defaultTransformResponse(
   baseQueryReturnValue: unknown,
   meta: unknown,
-  arg: unknown
+  arg: unknown,
 ) {
   return baseQueryReturnValue
 }
@@ -205,7 +232,11 @@ argument, which can be used while determining the transformed response. The valu
 dependent on the `baseQuery` used.
 
 ```ts title="transformErrorResponse meta example" no-transpile
-transformErrorResponse: (response: { data: { sideA: Tracks; sideB: Tracks } }, meta, arg) => {
+transformErrorResponse: (
+  response: { data: { sideA: Tracks; sideB: Tracks } },
+  meta,
+  arg,
+) => {
   if (meta?.coinFlip === 'heads') {
     return response.data.sideA
   }
@@ -228,22 +259,58 @@ transformErrorResponse: (response: Posts, meta, arg) => {
 
 ## Customizing queries with `queryFn`
 
-Individual endpoints on [`createApi`](../api/createApi.mdx) accept a [`queryFn`](../api/createApi.mdx#queryfn) property which allows a given endpoint to ignore `baseQuery` for that endpoint by providing an inline function determining how that query resolves.
+RTK Query comes with `fetchBaseQuery` out of the box, which makes it straightforward to define endpoints that talk to HTTP URLs (such as a typical REST API). We also have integrations with GraphQL as well. However, at its core, RTK Query is really about tracking loading state and cached values for _any_ async request/response sequence, not just HTTP requests.
 
-This can be useful for scenarios where you want to have particularly different behaviour for a single endpoint, or where the query itself is not relevant. Such situations may include:
+RTK Query supports defining endpoints that run arbitrary async logic and return a result. Individual endpoints on [`createApi`](../api/createApi.mdx) accept a [`queryFn`](../api/createApi.mdx#queryfn) property, which let you write your own async function with whatever logic you want inside.
+
+This can be useful for scenarios where you want to have particularly different behavior for a single endpoint, or where the query itself is not relevant, including:
 
 - One-off queries that use a different base URL
 - One-off queries that use different request handling, such as automatic re-tries
-- One-off queries that use different error handling behaviour
+- One-off queries that use different error handling behavior
+- Queries that make requests using a third-party library SDK, such as Firebase or Supabase
+- Queries that perform async tasks that are not a typical request/response
 - Performing multiple requests with a single query ([example](#performing-multiple-requests-with-a-single-query))
-- Leveraging invalidation behaviour with no relevant query ([example](#using-a-no-op-queryfn))
+- Leveraging invalidation behavior with no relevant query ([example](#using-a-no-op-queryfn))
 - Using [Streaming Updates](./streaming-updates) with no relevant initial request ([example](#streaming-data-with-no-initial-request))
 
 See also [`queryFn API Reference`](../api/createApi.mdx#queryfn) for the type signature and available options.
 
 ### Implementing a `queryFn`
 
-In order to use `queryFn`, it can be treated as an inline `baseQuery`. It will be called with the same arguments as `baseQuery`, as well as the provided `baseQuery` function itself (`arg`, `api`, `extraOptions`, and `baseQuery`). Similarly to `baseQuery`, it is expected to return an object with either a `data` or `error` property, or a promise that resolves to return such an object.
+A `queryFn` can be thought of as an inline `baseQuery`. It will be called with the same arguments as `baseQuery`, as well as the provided `baseQuery` function itself (`arg`, `api`, `extraOptions`, and `baseQuery`). Similarly to `baseQuery`, it is expected to return an object with either a `data` or `error` property, or a promise that resolves to return such an object.
+
+#### Basic `queryFn` Example
+
+```ts title="Basic queryFn example" no-transpile
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
+import { userAPI, User } from './userAPI'
+
+const api = createApi({
+  baseQuery: fetchBaseQuery({ url: '/' }),
+  endpoints: (build) => ({
+    // normal HTTP endpoint using fetchBaseQuery
+    getPosts: build.query<PostsResponse, void>({
+      query: () => ({ url: 'posts' }),
+    }),
+    // highlight-start
+    // endpoint with a custom `queryFn` and separate async logic
+    getUser: build.query<User, string>({
+      queryFn: async (userId: string) => {
+        try {
+          const user = await userApi.getUserById(userId)
+          // Return the result in an object with a `data` field
+          return { data: user }
+        } catch (error) {
+          // Catch any errors and return them as an object with an `error` field
+          return { error }
+        }
+      },
+    }),
+    // highlight-end
+  }),
+})
+```
 
 #### queryFn function arguments
 
@@ -253,7 +320,7 @@ const queryFn = (
   args,
   { signal, dispatch, getState },
   extraOptions,
-  baseQuery
+  baseQuery,
   // highlight-end
 ) => {
   // omitted
@@ -274,7 +341,7 @@ const queryFn = (
   args,
   { signal, dispatch, getState },
   extraOptions,
-  baseQuery
+  baseQuery,
 ) => {
   // highlight-start
   if (Math.random() > 0.5) return { error: 'Too high!' }
@@ -298,27 +365,34 @@ import type { AxiosRequestConfig, AxiosError } from 'axios'
 // highlight-start
 const axiosBaseQuery =
   (
-    { baseUrl }: { baseUrl: string } = { baseUrl: '' }
+    { baseUrl }: { baseUrl: string } = { baseUrl: '' },
   ): BaseQueryFn<
     {
       url: string
-      method: AxiosRequestConfig['method']
+      method?: AxiosRequestConfig['method']
       data?: AxiosRequestConfig['data']
       params?: AxiosRequestConfig['params']
+      headers?: AxiosRequestConfig['headers']
     },
     unknown,
     unknown
   > =>
-  async ({ url, method, data, params }) => {
+  async ({ url, method, data, params, headers }) => {
     try {
-      const result = await axios({ url: baseUrl + url, method, data, params })
+      const result = await axios({
+        url: baseUrl + url,
+        method,
+        data,
+        params,
+        headers,
+      })
       return { data: result.data }
     } catch (axiosError) {
-      let err = axiosError as AxiosError
+      const err = axiosError as AxiosError
       return {
         error: {
           status: err.response?.status,
-          data: err.response?.data || err.message
+          data: err.response?.data || err.message,
         },
       }
     }
@@ -494,7 +568,7 @@ const baseQueryWithReauth: BaseQueryFn<
         const refreshResult = await baseQuery(
           '/refreshToken',
           api,
-          extraOptions
+          extraOptions,
         )
         if (refreshResult.data) {
           api.dispatch(tokenReceived(refreshResult.data))
@@ -543,7 +617,7 @@ The `retry` utility has a `fail` method property attached which can be used to b
 
 ```ts title="Bailing out of error re-tries"
 import { createApi, fetchBaseQuery, retry } from '@reduxjs/toolkit/query/react'
-import type { FetchArgs } from '@reduxjs/toolkit/dist/query/fetchBaseQuery'
+import type { FetchArgs } from '@reduxjs/toolkit/query'
 interface Post {
   id: number
   name: string
@@ -556,20 +630,20 @@ const staggeredBaseQueryWithBailOut = retry(
     const result = await fetchBaseQuery({ baseUrl: '/api/' })(
       args,
       api,
-      extraOptions
+      extraOptions,
     )
 
     // bail out of re-tries immediately if unauthorized,
     // because we know successive re-retries would be redundant
     if (result.error?.status === 401) {
-      retry.fail(result.error)
+      retry.fail(result.error, result.meta)
     }
 
     return result
   },
   {
     maxRetries: 5,
-  }
+  },
 )
 // highlight-end
 
@@ -610,16 +684,13 @@ In such a scenario, the return value would look like so:
 export declare const uuid: () => string
 
 // file: metaBaseQuery.ts
-import {
-  fetchBaseQuery,
-  createApi,
-} from '@reduxjs/toolkit/query'
+import { fetchBaseQuery, createApi } from '@reduxjs/toolkit/query'
 import type {
   BaseQueryFn,
   FetchArgs,
   FetchBaseQueryError,
 } from '@reduxjs/toolkit/query'
-import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/dist/query/fetchBaseQuery'
+import type { FetchBaseQueryMeta } from '@reduxjs/toolkit/query'
 import { uuid } from './idGenerator'
 
 // highlight-start
@@ -643,7 +714,7 @@ const metaBaseQuery: BaseQueryFn<
   const baseResult = await fetchBaseQuery({ baseUrl: '/' })(
     args,
     api,
-    extraOptions
+    extraOptions,
   )
 
   return {
@@ -678,7 +749,7 @@ const api = createApi({
         // These properties can be used to transform the response as desired.
         if (!meta) return []
         return returnValue.filter(
-          (post) => post.timestamp >= meta.timestamp - DAY_MS
+          (post) => post.timestamp >= meta.timestamp - DAY_MS,
         )
       },
       // highlight-end
@@ -710,10 +781,7 @@ export interface Post {
 }
 
 // file: src/services/api.ts
-import {
-  createApi,
-  fetchBaseQuery,
-} from '@reduxjs/toolkit/query/react'
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type {
   BaseQueryFn,
   FetchArgs,
@@ -864,7 +932,7 @@ const postsAdapter = createEntityAdapter<Post>({
 export const api = createApi({
   baseQuery: fetchBaseQuery({ baseUrl: '/' }),
   endpoints: (build) => ({
-    getPosts: build.query<EntityState<Post>, void>({
+    getPosts: build.query<EntityState<Post, number>, void>({
       query: () => `posts`,
       // highlight-start
       transformResponse(response: Post[]) {
@@ -880,11 +948,39 @@ export const { useGetPostsQuery } = api
 
 ## Examples - `queryFn`
 
+### Using a Third-Party SDK
+
+Many services like Firebase and Supabase provide their own SDK to make requests. You can use those SDK methods in a `queryFn`:
+
+```ts title="Basic Third-Party SDK" no-transpile
+import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query/react'
+import { supabase } from './supabaseApi'
+
+export const supabaseApi = createApi({
+  reducerPath: 'supabaseApi',
+  baseQuery: fakeBaseQuery(),
+  endpoints: (builder) => ({
+    getBlogs: builder.query({
+      queryFn: async () => {
+        // Supabase conveniently already has `data` and `error` fields
+        const { data, error } = await supabase.from('blogs').select()
+        if (error) {
+          return { error }
+        }
+        return { data }
+      },
+    }),
+  }),
+})
+```
+
+You could also try creating a custom base query that uses the SDK, and define endpoints that pass method names or args into that base query.
+
 ### Using a no-op queryFn
 
 In certain scenarios, you may wish to have a `query` or `mutation` where sending a request or returning data is not relevant for the situation. Such a scenario would be to leverage the `invalidatesTags` property to force re-fetch specific `tags` that have been provided to the cache.
 
-See also [`providing errors to the cache`](./automated-refetching.mdx#providing-data-to-the-cache) to see additional detail and an example for such a scenario to 'refetch errored queries'.
+See also ["providing errors to the cache"](./automated-refetching.mdx#providing-errors-to-the-cache) to see additional detail and an example for such a scenario to 'refetch errored queries'.
 
 ```ts title="Using a no-op queryFn"
 // file: types.ts noEmit
@@ -919,7 +1015,7 @@ const api = createApi({
     refetchPostsAndUsers: build.mutation<null, void>({
       // The query is not relevant here, so a `null` returning `queryFn` is used
       queryFn: () => ({ data: null }),
-      // This mutation takes advantage of tag invalidation behaviour to trigger
+      // This mutation takes advantage of tag invalidation behavior to trigger
       // any queries that provide the 'Post' or 'User' tags to re-fetch if the queries
       // are currently subscribed to the cached data
       invalidatesTags: ['Post', 'User'],
@@ -987,10 +1083,7 @@ export interface User {
 }
 
 // file: api.ts
-import {
-  createApi,
-  fetchBaseQuery,
-} from '@reduxjs/toolkit/query'
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import type { Post, User } from './types'
 
@@ -1001,7 +1094,8 @@ const api = createApi({
       async queryFn(_arg, _queryApi, _extraOptions, fetchWithBQ) {
         // get a random user
         const randomResult = await fetchWithBQ('users/random')
-        if (randomResult.error) return { error: randomResult.error as FetchBaseQueryError } 
+        if (randomResult.error)
+          return { error: randomResult.error as FetchBaseQueryError }
         const user = randomResult.data as User
         const result = await fetchWithBQ(`user/${user.id}/posts`)
         return result.data

@@ -1,15 +1,13 @@
+import { noop } from '@internal/listenerMiddleware/utils'
+import type { PayloadAction } from '@reduxjs/toolkit'
 import {
   configureStore,
   createAction,
+  createListenerMiddleware,
   createSlice,
   isAnyOf,
+  TaskAbortError,
 } from '@reduxjs/toolkit'
-
-import type { AnyAction, PayloadAction, Action } from '@reduxjs/toolkit'
-
-import { createListenerMiddleware, TaskAbortError } from '../index'
-
-import type { TypedAddListener } from '../index'
 
 describe('Saga-style Effects Scenarios', () => {
   interface CounterState {
@@ -56,10 +54,7 @@ describe('Saga-style Effects Scenarios', () => {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
-  beforeAll(() => {
-    const noop = () => {}
-    jest.spyOn(console, 'error').mockImplementation(noop)
-  })
+  const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(noop)
 
   beforeEach(() => {
     listenerMiddleware = createListenerMiddleware<CounterState>()
@@ -69,6 +64,14 @@ describe('Saga-style Effects Scenarios', () => {
       reducer,
       middleware: (gDM) => gDM().prepend(middleware),
     })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterAll(() => {
+    vi.restoreAllMocks()
   })
 
   test('throttle', async () => {
@@ -194,7 +197,7 @@ describe('Saga-style Effects Scenarios', () => {
         listenerApi.unsubscribe()
 
         // Pretend we're doing expensive work
-        await listenerApi.delay(15)
+        await listenerApi.delay(25)
 
         workPerformed++
 
@@ -221,7 +224,7 @@ describe('Saga-style Effects Scenarios', () => {
     expect(listenerCalls).toBe(1)
     expect(workPerformed).toBe(0)
 
-    await delay(20)
+    await delay(50)
 
     // Work finished, should have resubscribed
     expect(workPerformed).toBe(1)
@@ -232,7 +235,7 @@ describe('Saga-style Effects Scenarios', () => {
     expect(listenerCalls).toBe(2)
     expect(workPerformed).toBe(1)
 
-    await delay(20)
+    await delay(50)
 
     expect(workPerformed).toBe(2)
   })
